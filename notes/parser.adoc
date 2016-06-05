@@ -1,0 +1,37 @@
+= Green Basic Parser
+
+== Components
+
+* numvar = <char> <char-or-digit>?
+* strvar = <numvar> $
+* var = <numvar> | <strvar>
+  * can also be var + array indexes
+* number
+* expr = vars, numbers, function calls as operands; operators
+* expr-or-string = expr or string
+* linenum = integer
+* operator = +, -, *, /, **
+* relation = >, <, =, >=, <=, !=
+* fnname = <letter> (<letter-or-digit>)+ 
+  * docs say FN <letter>
+
+== Statements
+
+* LET <var> = <expr> | <string>
+* READ <var> (, <var>)*
+* DATA <number> (, <number>)*
+* RESTORE
+* PRINT <expr-or-string> (, <expr-or-string>)*
+* GOTO <linenum>
+* IF <expr> <relation> <expr> THEN <linenum>
+* ON <numvar> GOTO <linenum> (, <linenum>)+
+* FOR <numvar> = <expr> TO <expr> STEP <expr>
+* DIM <var> \( <int> (, <int>)? \)
+* END
+* RANDOM (<int>)?
+* GOSUB <linenum>
+* RETURN
+* DEF <fnname> \( <var>? (, <var>)* \) = <expr>
+* INPUT <var> (, <var>)*
+* REM <comment>
+* STOP
