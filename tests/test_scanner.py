@@ -1,6 +1,9 @@
 import pytest
-from gbasic.scanner import scan_ws, scan_keyword, GBasicSyntaxError
-
+import string
+import random
+from gbasic.scanner import *
+from hypothesis import given, settings, Verbosity
+from hypothesis import strategies as st
 
 def test_scan_ws_finds_next_non_ws_from_start():
     text = "   PRINT"
@@ -22,6 +25,28 @@ def test_scan_ws_returns_cur_idx_if_at_end_of_line():
     _, idx = scan_ws(text, 8)
     assert idx == 8
 
+def test_check_lineno():
+    text = "10 END"
+    lineno = check_lineno(text, 0)
+    assert lineno == "10"
+
+    lineno = check_lineno(text, 2)
+    assert lineno is None
+
+def test_scan_lineno():
+    text = "10 END"
+    lineno, idx = scan_lineno(text, 0)
+    assert lineno == 10
+    assert idx == 2
+
+def test_scan_lineno_syntax_error():
+    text = "10 PRINT"
+    with pytest.raises(GBasicSyntaxError) as exinfo:
+        lineno, idx = scan_lineno(text, 2)
+    assert exinfo.value.idx == 3
+    assert exinfo.value.message == "Line number expected"
+
+
 def test_scan_keyword_finds_keyword():
     text = "LET A = 1"
     kw, idx = scan_keyword(text, 0)
@@ -40,4 +65,39 @@ def test_scan_keyword_errors_if_no_keyword():
         kw, idx = scan_keyword(text, 0)
     assert exinfo.value.idx == 0
     assert exinfo.value.message == "Keyword expected"
+
+def gen_varname(x, y, strvar):
+    var = x
+    if random.randint(0, 1):
+        var += str(y)
+    if strvar:
+        var += "$"
+    return var
+
+def test_check_variable():
+    text = "10 LET X1 = 1"
+    assert check_variable(text, 0) is None
+    assert check_variable(text, 7) == "X1"
+
+@given(st.builds(gen_varname,
+                 st.sampled_from(string.ascii_uppercase),
+                 st.sampled_from(string.ascii_uppercase + string.digits),
+                 st.booleans()))
+def test_check_variable_generated(var):
+    assert check_variable(var, 0) == var
+
+@given(start=st.text(), num=st.integers())
+def test_check_number_integers_generated(start, num):
+    text = start + str(num)
+    assert int(check_number(text, len(start))) == num
+
+@given(num=st.floats(allow_infinity=False, allow_nan=False),
+       start=st.text())
+def test_check_number_floats_generated(start, num):
+    text = start + str(num)
+    cnum = float(check_number(text, len(start)))
     
+    if abs(num) < 1:
+        assert (cnum - num) < 0.00001
+    else:
+        assert cnum == num
