@@ -118,10 +118,31 @@ def check_number(text, idx):
 def scan_number(text, cur_idx):
     _, idx = scan_ws(text, cur_idx)
     numstr = check_number(text, idx)
-    if numstr:
+    if numstr is not None:
         if "." in numstr or 'e' in numstr:
             num = float(numstr)
         else:
             num = int(numstr)
 
         return num, idx + len(numstr)
+    else:
+        raise GBasicSyntaxError(idx, "Number expected")
+
+def check_string(text, idx):
+    """Checks for a quoted string. All strings are quoted with double quotes."""
+    str_regex = re.compile(r"\"(?:[^\"\\]|\\.)*\"")
+    match = str_regex.match(text[idx:])
+    if match:
+        return match.group(0)
+
+def unquote_string(quoted_str):
+    return quoted_str[1:-1].replace('\\"', '"').replace('\\\\', '\\')
+
+def scan_string(text, cur_idx):
+    _, idx = scan_ws(text, cur_idx)
+    quoted_str = check_string(text, idx)
+    if quoted_str is not None:
+        string = unquote_string(quoted_str)
+        return string, idx + len(quoted_str)
+    else:
+        raise GBasicSyntaxError(idx, "String expected")

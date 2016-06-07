@@ -101,3 +101,20 @@ def test_check_number_floats_generated(start, num):
         assert (cnum - num) < 0.00001
     else:
         assert cnum == num
+
+valid_str_chars = string.ascii_uppercase + string.ascii_lowercase + \
+                  string.digits + string.punctuation
+
+def quote_text(text):
+    return '"{}"'.format(text.replace('\\', '\\\\').replace('"', '\\"'))
+
+@given(st.text(alphabet=valid_str_chars))
+def test_check_string_generated(text):
+    quoted = quote_text(text)
+    assert check_string(quoted, 0) == quoted
+
+@given(st.text(alphabet=valid_str_chars))
+def test_scan_string_generated(text):
+    quoted = quote_text(text)
+    out, _ = scan_string(quoted, 0)
+    assert out == text
