@@ -118,3 +118,12 @@ def test_scan_string_generated(text):
     quoted = quote_text(text)
     out, _ = scan_string(quoted, 0)
     assert out == text
+
+def test_check_chars():
+    check_comma = check_chars(",")
+    text = "20 PRINT A$, B$"
+    assert check_comma(text, 11) == ","
+
+    check_to = check_chars("TO")
+    text = "30 FOR A = 1 TO 10"
+    assert check_to(text, 13) == "TO"

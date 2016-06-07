@@ -50,6 +50,7 @@ def scan_ws(text, cur_idx):
     except StopIteration:
         return "", cur_idx
 
+
 def check_lineno(text, idx):
     """Checks for line numbers. Line numbers must be positive integers."""
     match = re.match(r"\d+", text[idx:])
@@ -67,6 +68,7 @@ def scan_lineno(text, cur_idx):
     else:
         raise GBasicSyntaxError(idx, "Line number expected")
 
+
 def scan_keyword(text, cur_idx):
     """Scan for a keyword."""
     
@@ -78,6 +80,7 @@ def scan_keyword(text, cur_idx):
         return keyword, idx
     except StopIteration:
         raise GBasicSyntaxError(idx, "Keyword expected")
+
 
 def check_variable(text, idx):
     """Check for a variable name.
@@ -95,6 +98,7 @@ def scan_variable(text, cur_idx):
         return var, idx + len(var)
     else:
         raise GBasicSyntaxError(idx, "Variable name expected")
+
 
 def check_number(text, idx):
     """Check for a number. We are allowing more than the BASIC standard here.
@@ -128,6 +132,7 @@ def scan_number(text, cur_idx):
     else:
         raise GBasicSyntaxError(idx, "Number expected")
 
+
 def check_string(text, idx):
     """Checks for a quoted string. All strings are quoted with double quotes."""
     str_regex = re.compile(r"\"(?:[^\"\\]|\\.)*\"")
@@ -146,3 +151,23 @@ def scan_string(text, cur_idx):
         return string, idx + len(quoted_str)
     else:
         raise GBasicSyntaxError(idx, "String expected")
+
+
+def check_chars(chars):
+    """Check for any particular characters."""
+    def check(text, idx):
+        if text[idx:].startswith(chars):
+            return chars
+
+    return check
+
+def scan_chars(chars):
+    check = check_chars(chars)
+
+    def scan(text, idx):
+        _, idx = scan_ws(text, cur_idx)
+        out = check(text, idx)
+        if out == chars:
+            return chars, idx + len(chars)
+
+    return scan
