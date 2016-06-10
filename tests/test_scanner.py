@@ -86,6 +86,19 @@ def test_check_variable():
 def test_check_variable_generated(var):
     assert check_variable(var, 0) == var
 
+@given(st.builds(gen_varname,
+                 st.sampled_from(string.ascii_uppercase),
+                 st.sampled_from(string.ascii_uppercase + string.digits),
+                 st.booleans()))
+def test_scan_variable_generated(var):
+    tok, idx =  scan_variable(var, 0)
+
+    assert tok[1] == var
+    if var[-1] == "$":
+        assert tok[0] == Token.strvar
+    else:
+        assert tok[0] == Token.numvar
+
 @given(start=st.text(), num=st.integers())
 def test_check_number_integers_generated(start, num):
     text = start + str(num)
@@ -135,20 +148,20 @@ def test_scan_primary():
 
     text = "A1"
     out, _ = scan_primary(text, 0)
-    assert out == "A1"
+    assert out == (Token.numvar, "A1")
 
     text = "(1 + 2)"
     out, _ = scan_primary(text, 0)
     assert out == [1, 2, (Token.operator, "+")]
 
-def text_scan_expression():
+def test_scan_expression():
     text = "3.5"
     out, _ = scan_expression(text, 0)
     assert out == 3.5
 
     text = "A1"
     out, _ = scan_expression(text, 0)
-    assert out == "A1"
+    assert out == (Token.numvar, "A1")
 
     text = "1 + 2"
     out, _ = scan_expression(text, 0)
@@ -156,6 +169,6 @@ def text_scan_expression():
 
     text = "A1 ^ 2 + 2 * (A2 + 1)"
     out, _ = scan_expression(text, 0)
-    assert out == [["A1", 2, (Token.operator, "^")],
-                   ["2", ["A2", 1, (Token.operator, "+")], (Token.operator, "*")],
+    assert out == [[(Token.numvar, "A1"), 2, (Token.operator, "^")],
+                   [2, [(Token.numvar, "A2"), 1, (Token.operator, "+")], (Token.operator, "*")],
                    (Token.operator, "+")]

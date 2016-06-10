@@ -1,7 +1,8 @@
 import re
 from enum import Enum
+from functools import wraps
 
-Token = Enum('Token', 'number string operator keyword variable')
+Token = Enum('Token', 'number string operator keyword strvar numvar')
 Keyword = Enum('Keyword', " ".join((
     'LET',
     'READ',
@@ -40,6 +41,14 @@ class GBasicSyntaxError(Exception):
         self.idx = idx
         self.message = message
         super().__init__(idx, message)
+
+
+def allow_ws(scanfn):
+    @wraps(scanfn)
+    def wrapper(text, idx):
+        _, idx = scan_ws(text, idx)
+        return scanfn(text, idx)
+    return wrapper
         
 
 def scan_ws(text, cur_idx):
@@ -53,17 +62,15 @@ def scan_ws(text, cur_idx):
     except StopIteration:
         return "", cur_idx
 
-
 def check_lineno(text, idx):
     """Checks for line numbers. Line numbers must be positive integers."""
     match = re.match(r"\d+", text[idx:])
     if match:
         return match.group(0)
 
-def scan_lineno(text, cur_idx):
+@allow_ws
+def scan_lineno(text, idx):
     """Scans for line numbers. Line numbers must be positive integers."""
-
-    _, idx = scan_ws(text, cur_idx)
     lineno = check_lineno(text, idx)
 
     if lineno:
@@ -71,12 +78,9 @@ def scan_lineno(text, cur_idx):
     else:
         raise GBasicSyntaxError(idx, "Line number expected")
 
-
-def scan_keyword(text, cur_idx):
+@allow_ws
+def scan_keyword(text, idx):
     """Scan for a keyword."""
-    
-    _, idx = scan_ws(text, cur_idx)
-    
     try:
         keyword = next(kw.name for kw in Keyword if text.startswith(kw.name, idx))
         idx += len(keyword)
@@ -93,11 +97,15 @@ def check_variable(text, idx):
     if match:
         return match.group(0)
 
-def scan_variable(text, cur_idx):
+@allow_ws
+def scan_variable(text, idx):
     """Scan for a variable name."""
-    _, idx = scan_ws(text, cur_idx)
     var = check_variable(text, idx)
     if var:
+        if var[-1] == "$":
+            var = (Token.strvar, var)
+        else:
+            var = (Token.numvar, var)
         return var, idx + len(var)
     else:
         raise GBasicSyntaxError(idx, "Variable name expected")
@@ -122,8 +130,8 @@ def check_number(text, idx):
 
         return num
 
-def scan_number(text, cur_idx):
-    _, idx = scan_ws(text, cur_idx)
+@allow_ws
+def scan_number(text, idx):
     numstr = check_number(text, idx)
     if numstr is not None:
         if "." in numstr or 'e' in numstr:
