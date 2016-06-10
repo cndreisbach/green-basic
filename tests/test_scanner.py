@@ -127,3 +127,35 @@ def test_check_chars():
     check_to = check_chars("TO")
     text = "30 FOR A = 1 TO 10"
     assert check_to(text, 13) == "TO"
+
+def test_scan_primary():
+    text = "3.5"
+    out, _ = scan_primary(text, 0)
+    assert out == 3.5
+
+    text = "A1"
+    out, _ = scan_primary(text, 0)
+    assert out == "A1"
+
+    text = "(1 + 2)"
+    out, _ = scan_primary(text, 0)
+    assert out == [1, 2, (Token.operator, "+")]
+
+def text_scan_expression():
+    text = "3.5"
+    out, _ = scan_expression(text, 0)
+    assert out == 3.5
+
+    text = "A1"
+    out, _ = scan_expression(text, 0)
+    assert out == "A1"
+
+    text = "1 + 2"
+    out, _ = scan_expression(text, 0)
+    assert out == [1, 2, (Token.operator, "+")]
+
+    text = "A1 ^ 2 + 2 * (A2 + 1)"
+    out, _ = scan_expression(text, 0)
+    assert out == [["A1", 2, (Token.operator, "^")],
+                   ["2", ["A2", 1, (Token.operator, "+")], (Token.operator, "*")],
+                   (Token.operator, "+")]

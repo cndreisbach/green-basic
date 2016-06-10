@@ -1,6 +1,8 @@
 import re
+from enum import Enum
 
-KEYWORDS = (
+Token = Enum('Token', 'number string operator keyword variable')
+Keyword = Enum('Keyword', " ".join((
     'LET',
     'READ',
     'DATA',
@@ -19,7 +21,8 @@ KEYWORDS = (
     'INPUT',
     'REM',
     'STOP',
-)
+)))
+
 
 # A scan function should:
 # - take text and cur_idx
@@ -75,7 +78,7 @@ def scan_keyword(text, cur_idx):
     _, idx = scan_ws(text, cur_idx)
     
     try:
-        keyword = next(kw for kw in KEYWORDS if text.startswith(kw, idx))
+        keyword = next(kw.name for kw in Keyword if text.startswith(kw.name, idx))
         idx += len(keyword)
         return keyword, idx
     except StopIteration:
@@ -153,21 +156,162 @@ def scan_string(text, cur_idx):
         raise GBasicSyntaxError(idx, "String expected")
 
 
-def check_chars(chars):
+def check_chars(chars, ws_ok=True):
     """Check for any particular characters."""
     def check(text, idx):
+        if ws_ok:
+            ws, idx = scan_ws(text, idx)
+        else:
+            ws = ""
         if text[idx:].startswith(chars):
-            return chars
+            return ws + chars
 
     return check
 
-def scan_chars(chars):
-    check = check_chars(chars)
+def scan_chars(chars, ws_ok=True):
+    check = check_chars(chars, ws_ok)
 
     def scan(text, idx):
-        _, idx = scan_ws(text, cur_idx)
-        out = check(text, idx)
+        out_ws = check(text, idx)
+        if ws_ok:
+            out = out_ws.lstrip()
+        else:
+            out = out_ws
         if out == chars:
-            return chars, idx + len(chars)
+            return chars, idx + len(out_ws)
 
     return scan
+
+
+# How to best represent each type of token?
+# I could use classes or named tuples, like so:
+#
+# Add(3, Mult(2, 3))
+#
+# or I could use reverse Polish and only strings and numbers, like so:
+#
+# 2 3 MULT 3 ADD
+#
+# Since I do have strings in my language, I may have to at least have
+# an indicator for the operators. Example:
+#
+# LET A$ = "HELLO"
+#
+# A$ HELLO LETSTR won't work, as A$ is a variable and LETSTR is an
+# internal command.
+#
+# Commands could be enums.
+# Variables and user-defined functions could be namedtuples or
+# objects.
+#
+# Another option, more low-level, is to have each token represented
+# internally by a tuple with an opcode to say what it is (variable,
+# operator, keyword, number, etc) and the second element being it.
+
+# To scan an expression, we use the following recursive descent grammar
+#
+# expression = (+|-)? term ((+|-) term)*
+# term = factor (("/"|"*") factor)*
+# factor = primary (^ primary)*
+# primary = variable | constant | "(" expression ")"
+
+def sqz(a_list):
+    """Squeeze a list that has only one element, removing the outer list."""
+    while type(a_list) is list and len(a_list) == 1:
+        a_list = a_list[0]
+    return a_list
+
+def scan_primary(text, cur_idx):
+    _, idx = scan_ws(text, cur_idx)
+
+    if check_number(text, idx):
+        return scan_number(text, idx)
+    elif check_variable(text, idx):
+        return scan_variable(text, idx)
+    elif check_chars("(")(text, idx):
+        _, idx = scan_chars("(")(text, idx)
+        primary, idx = scan_expression(text, idx)
+        _, idx = scan_chars(")")(text, idx)
+        return primary, idx
+
+    raise GBasicSyntaxError(cur_idx, "Number, variable, or expression expected")
+
+def scan_factor(text, cur_idx):
+    check_exp = check_chars("^")
+    scan_exp = scan_chars("^")
+
+    out = []
+    idx = cur_idx
+
+    primary, idx = scan_primary(text, idx)
+    out.append(primary)
+
+    while check_exp(text, idx):
+        _, idx = scan_exp(text, idx)
+        primary, idx = scan_primary(text, idx)
+        out.append(primary)
+        out.append((Token.operator, "^"))
+
+    return sqz(out), idx
+
+def scan_term(text, cur_idx):
+    check_mul = check_chars("*")
+    scan_mul = scan_chars("*")
+    check_div = check_chars("/")
+    scan_div = scan_chars("/")
+
+    out = []
+    idx = cur_idx
+
+    factor, idx = scan_factor(text, idx)
+    out.append(factor)
+
+    # TODO: fix all this crap
+    while check_mul(text, idx) or check_div(text, idx):
+        try:
+            op, idx = scan_mul(text, idx)
+        except TypeError:
+            op, idx = scan_div(text, idx)
+
+        factor, idx = scan_factor(text, idx)
+
+        out.append(factor)
+        out.append((Token.operator, op))
+
+    return sqz(out), idx
+
+def scan_expression(text, cur_idx):
+    check_add = check_chars("+")
+    scan_add = scan_chars("+")
+    check_sub = check_chars("-")
+    scan_sub = scan_chars("-")
+
+    out = []
+    idx = cur_idx
+
+    # Unary +/-
+    if check_add(text, idx):
+        op, idx = scan_add(text, idx)
+    elif check_sub(text, idx):
+        op, idx = scan_sub(text, idx)
+    else:
+        op = None
+
+    term, idx = scan_term(text, idx)
+    out.append(term)
+    if op:
+        out.append((Token.operator, op))
+
+    # TODO: fix all this crap
+    while check_add(text, idx) or check_sub(text, idx):
+        try:
+            op, idx = scan_add(text, idx)
+        except TypeError:
+            op, idx = scan_sub(text, idx)
+
+        term, idx = scan_term(text, idx)
+
+        out.append(term)
+        out.append((Token.operator, op))
+
+    return sqz(out), idx
