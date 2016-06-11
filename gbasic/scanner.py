@@ -23,6 +23,7 @@ Keyword = Enum('Keyword', " ".join((
     'REM',
     'STOP',
 )))
+Op = Enum('Op', 'LETNUM LETSTR')
 
 
 # A scan function should:
@@ -54,6 +55,10 @@ def allow_ws(scanfn):
 def scan_ws(text, cur_idx):
     """Scans for whitespace. Whitespace is never necessary, so if we do not
     find it, return the current index instead of erroring."""
+
+    # Return immediately if all we have is whitespace.
+    if text[cur_idx:].lstrip() == '':
+        return text[cur_idx:], len(text)
     
     try:
         idx = next(i for i in range(cur_idx, len(text))
@@ -84,7 +89,7 @@ def scan_keyword(text, idx):
     try:
         keyword = next(kw.name for kw in Keyword if text.startswith(kw.name, idx))
         idx += len(keyword)
-        return keyword, idx
+        return (Token.keyword, keyword), idx
     except StopIteration:
         raise GBasicSyntaxError(idx, "Keyword expected")
 
@@ -106,7 +111,7 @@ def scan_variable(text, idx):
             var = (Token.strvar, var)
         else:
             var = (Token.numvar, var)
-        return var, idx + len(var)
+        return var, idx + len(var[1])
     else:
         raise GBasicSyntaxError(idx, "Variable name expected")
 
@@ -180,13 +185,15 @@ def scan_chars(chars, ws_ok=True):
     check = check_chars(chars, ws_ok)
 
     def scan(text, idx):
-        out_ws = check(text, idx)
+        out_ws = check(text, idx) or ""
         if ws_ok:
             out = out_ws.lstrip()
         else:
             out = out_ws
         if out == chars:
             return chars, idx + len(out_ws)
+        else:
+            raise GBasicSyntaxError(idx, "Characters '{}' expected".format(chars))
 
     return scan
 
@@ -229,6 +236,7 @@ def sqz(a_list):
         a_list = a_list[0]
     return a_list
 
+@allow_ws
 def scan_primary(text, cur_idx):
     _, idx = scan_ws(text, cur_idx)
 
@@ -237,13 +245,16 @@ def scan_primary(text, cur_idx):
     elif check_variable(text, idx):
         return scan_variable(text, idx)
     elif check_chars("(")(text, idx):
+        print(repr(text[idx:]))
         _, idx = scan_chars("(")(text, idx)
+        print(repr(text[idx:]))
         primary, idx = scan_expression(text, idx)
         _, idx = scan_chars(")")(text, idx)
         return primary, idx
 
     raise GBasicSyntaxError(cur_idx, "Number, variable, or expression expected")
 
+@allow_ws
 def scan_factor(text, cur_idx):
     check_exp = check_chars("^")
     scan_exp = scan_chars("^")
@@ -262,6 +273,7 @@ def scan_factor(text, cur_idx):
 
     return sqz(out), idx
 
+@allow_ws
 def scan_term(text, cur_idx):
     check_mul = check_chars("*")
     scan_mul = scan_chars("*")
@@ -288,6 +300,7 @@ def scan_term(text, cur_idx):
 
     return sqz(out), idx
 
+@allow_ws
 def scan_expression(text, cur_idx):
     check_add = check_chars("+")
     scan_add = scan_chars("+")
@@ -323,3 +336,41 @@ def scan_expression(text, cur_idx):
         out.append((Token.operator, op))
 
     return sqz(out), idx
+
+# Scanning whole lines
+
+@allow_ws
+def scan_eof(text, idx):
+    """At the end of a line, we need to know that it is done. This scans to
+    make sure we're at the end of the line."""
+
+    if text[idx:] == '':
+        return True, idx
+    else:
+        raise GBasicSyntaxError(idx, "End of line expected")
+
+@allow_ws
+def scan_let(text, idx):
+    """This scans a line to make sure it is a valid LET. It is assumed that
+    we have already scanned the keyword LET and so idx will be placed after
+    that."""
+
+    var, idx = scan_variable(text, idx)
+    _, idx = scan_chars("=")(text, idx)
+
+    if var[0] == Token.numvar:
+        expression, idx = scan_expression(text, idx)
+        scan_eof(text, idx)
+        return [var, expression, Op.LETNUM], idx
+    else:
+        outstr, idx = scan_string(text, idx)
+        scan_eof(text, idx)
+        return [var, outstr, Op.LETSTR], idx
+
+@allow_ws
+def scan_line(text, idx):
+    keyword, idx = scan_keyword(text, idx)
+    if keyword[1] == "LET":
+        return scan_let(text, idx)
+    else:
+        raise GBasicSyntaxError(idx, "{} not yet implemented".format(keyword[1]))

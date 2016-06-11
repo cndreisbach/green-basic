@@ -50,13 +50,13 @@ def test_scan_lineno_syntax_error():
 def test_scan_keyword_finds_keyword():
     text = "LET A = 1"
     kw, idx = scan_keyword(text, 0)
-    assert kw == "LET"
+    assert kw == (Token.keyword, "LET")
     assert idx == 3
 
 def test_scan_keyword_finds_keyword_past_ws():
     text = "  LET A = 1"
     kw, idx = scan_keyword(text, 0)
-    assert kw == "LET"
+    assert kw == (Token.keyword, "LET")
     assert idx == 5
 
 def test_scan_keyword_errors_if_no_keyword():
@@ -172,3 +172,38 @@ def test_scan_expression():
     assert out == [[(Token.numvar, "A1"), 2, (Token.operator, "^")],
                    [2, [(Token.numvar, "A2"), 1, (Token.operator, "+")], (Token.operator, "*")],
                    (Token.operator, "+")]
+
+    text = "(10 + A) * 7"
+    out, _ = scan_expression(text, 0)
+    assert out == [[10, (Token.numvar, "A"), (Token.operator, "+")],
+                   7, (Token.operator, "*")]
+
+@given(st.text(), st.text(alphabet=string.whitespace))
+def test_scan_eof(text, ws):
+    all_text = text + ws
+    out, idx = scan_eof(all_text, len(text))
+    assert out
+    assert idx == len(all_text)
+
+def test_scan_let():
+    text = '10 LET A = 1'
+    out, idx = scan_let(text, 6)
+    assert out == [(Token.numvar, "A"), 1, Op.LETNUM]
+    assert idx == len(text)
+
+    text = '10 LET A$ = "HELLO"'
+    out, idx = scan_let(text, 6)
+    assert out == [(Token.strvar, "A$"), "HELLO", Op.LETSTR]
+    assert idx == len(text)
+
+    text = '10 LET BX = (10 + A) * 7'
+    out, idx = scan_let(text, 6)
+    assert out == [(Token.numvar, "BX"),
+                   [[10, (Token.numvar, "A"), (Token.operator, "+")],
+                    7, (Token.operator, "*")], Op.LETNUM]
+
+def test_scan_line():
+    text = '10 LET A = 1'
+    out, idx = scan_line(text, 2)
+    assert out == [(Token.numvar, "A"), 1, Op.LETNUM]
+    assert idx == len(text)
