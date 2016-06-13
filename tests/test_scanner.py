@@ -50,13 +50,13 @@ def test_scan_lineno_syntax_error():
 def test_scan_keyword_finds_keyword():
     text = "LET A = 1"
     kw, idx = scan_keyword(text, 0)
-    assert kw == (Token.keyword, "LET")
+    assert kw == "LET"
     assert idx == 3
 
 def test_scan_keyword_finds_keyword_past_ws():
     text = "  LET A = 1"
     kw, idx = scan_keyword(text, 0)
-    assert kw == (Token.keyword, "LET")
+    assert kw == "LET"
     assert idx == 5
 
 def test_scan_keyword_errors_if_no_keyword():
@@ -95,9 +95,9 @@ def test_scan_variable_generated(var):
 
     assert tok[1] == var
     if var[-1] == "$":
-        assert tok[0] == Token.strvar
+        assert tok[0] == Element.strvar
     else:
-        assert tok[0] == Token.numvar
+        assert tok[0] == Element.numvar
 
 @given(start=st.text(), num=st.integers())
 def test_check_number_integers_generated(start, num):
@@ -144,39 +144,48 @@ def test_check_chars():
 def test_scan_primary():
     text = "3.5"
     out, _ = scan_primary(text, 0)
-    assert out == 3.5
+    assert out == [3.5]
 
     text = "A1"
     out, _ = scan_primary(text, 0)
-    assert out == (Token.numvar, "A1")
+    assert out == [(Element.numvar, "A1")]
 
     text = "(1 + 2)"
     out, _ = scan_primary(text, 0)
-    assert out == [1, 2, (Token.operator, "+")]
+    assert out == [1, 2, (Element.op, Op.ADD)]
 
 def test_scan_expression():
     text = "3.5"
     out, _ = scan_expression(text, 0)
-    assert out == 3.5
+    assert out == [3.5]
 
     text = "A1"
     out, _ = scan_expression(text, 0)
-    assert out == (Token.numvar, "A1")
+    assert out == [(Element.numvar, "A1")]
 
     text = "1 + 2"
     out, _ = scan_expression(text, 0)
-    assert out == [1, 2, (Token.operator, "+")]
+    assert out == [1, 2, (Element.op, Op.ADD)]
 
     text = "A1 ^ 2 + 2 * (A2 + 1)"
     out, _ = scan_expression(text, 0)
-    assert out == [[(Token.numvar, "A1"), 2, (Token.operator, "^")],
-                   [2, [(Token.numvar, "A2"), 1, (Token.operator, "+")], (Token.operator, "*")],
-                   (Token.operator, "+")]
+    assert out == [(Element.numvar, "A1"),
+                   2,
+                   (Element.op, Op.POW),
+                   2,
+                   (Element.numvar, "A2"),
+                   1,
+                   (Element.op, Op.ADD),
+                   (Element.op, Op.MUL),
+                   (Element.op, Op.ADD)]
 
     text = "(10 + A) * 7"
     out, _ = scan_expression(text, 0)
-    assert out == [[10, (Token.numvar, "A"), (Token.operator, "+")],
-                   7, (Token.operator, "*")]
+    assert out == [10,
+                   (Element.numvar, "A"),
+                   (Element.op, Op.ADD),
+                   7,
+                   (Element.op, Op.MUL)]
 
 @given(st.text(), st.text(alphabet=string.whitespace))
 def test_scan_eof(text, ws):
@@ -188,22 +197,61 @@ def test_scan_eof(text, ws):
 def test_scan_let():
     text = '10 LET A = 1'
     out, idx = scan_let(text, 6)
-    assert out == [(Token.numvar, "A"), 1, Op.LETNUM]
+    assert out == [(Element.numvar, "A"),
+                   1,
+                   (Element.op, Op.LETNUM)]
     assert idx == len(text)
 
     text = '10 LET A$ = "HELLO"'
     out, idx = scan_let(text, 6)
-    assert out == [(Token.strvar, "A$"), "HELLO", Op.LETSTR]
+    assert out == [(Element.strvar, "A$"),
+                   "HELLO",
+                   (Element.op, Op.LETSTR)]
     assert idx == len(text)
 
     text = '10 LET BX = (10 + A) * 7'
     out, idx = scan_let(text, 6)
-    assert out == [(Token.numvar, "BX"),
-                   [[10, (Token.numvar, "A"), (Token.operator, "+")],
-                    7, (Token.operator, "*")], Op.LETNUM]
+    assert out == [(Element.numvar, "BX"),
+                   10,
+                   (Element.numvar, "A"),
+                   (Element.op, Op.ADD),
+                   7,
+                   (Element.op, Op.MUL),
+                   (Element.op, Op.LETNUM)]
+
+def test_scan_print():
+    text = '10 PRINT "HELLO"'
+    out, idx = scan_print(text, 8)
+    assert out == ["HELLO",
+                   1,
+                   (Element.op, Op.PRINT)]
+
+    text = "10 PRINT A"
+    out, idx = scan_print(text, 8)
+    assert out == [(Element.numvar, "A"),
+                   1,
+                   (Element.op, Op.PRINT)]
+
+    text = "10 PRINT A$"
+    out, idx = scan_print(text, 8)
+    assert out == [(Element.strvar, "A$"),
+                   1,
+                   (Element.op, Op.PRINT)]
+
+    text = '10 PRINT "HELLO", A$, BX, 3.5 ^ 7'
+    out, idx = scan_print(text, 8)
+    assert out == ["HELLO",
+                   (Element.strvar, "A$"),
+                   (Element.numvar, "BX"),
+                   3.5,
+                   7,
+                   (Element.op, Op.POW),
+                   4,
+                   (Element.op, Op.PRINT)]
+
 
 def test_scan_line():
     text = '10 LET A = 1'
     out, idx = scan_line(text, 2)
-    assert out == [(Token.numvar, "A"), 1, Op.LETNUM]
+    assert out == [(Element.numvar, "A"), 1, (Element.op, Op.LETNUM)]
     assert idx == len(text)

@@ -2,8 +2,15 @@ import re
 from enum import Enum
 from functools import wraps
 
-Token = Enum('Token', 'number string operator keyword strvar numvar')
-Keyword = Enum('Keyword', " ".join((
+Element = Enum('Element', 'lineno numlit strlit strvar numvar op')
+Op = Enum('Op', 'ADD SUB MUL DIV POW NEG LETNUM LETSTR PRINT')
+MathOps = {"+": Op.ADD,
+           "-": Op.SUB,
+           "*": Op.MUL,
+           "/": Op.DIV,
+           "^": Op.POW}
+
+keywords = {
     'LET',
     'READ',
     'DATA',
@@ -22,8 +29,7 @@ Keyword = Enum('Keyword', " ".join((
     'INPUT',
     'REM',
     'STOP',
-)))
-Op = Enum('Op', 'LETNUM LETSTR')
+}
 
 
 # A scan function should:
@@ -87,9 +93,9 @@ def scan_lineno(text, idx):
 def scan_keyword(text, idx):
     """Scan for a keyword."""
     try:
-        keyword = next(kw.name for kw in Keyword if text.startswith(kw.name, idx))
+        keyword = next(kw for kw in keywords if text.startswith(kw, idx))
         idx += len(keyword)
-        return (Token.keyword, keyword), idx
+        return keyword, idx
     except StopIteration:
         raise GBasicSyntaxError(idx, "Keyword expected")
 
@@ -108,9 +114,9 @@ def scan_variable(text, idx):
     var = check_variable(text, idx)
     if var:
         if var[-1] == "$":
-            var = (Token.strvar, var)
+            var = (Element.strvar, var)
         else:
-            var = (Token.numvar, var)
+            var = (Element.numvar, var)
         return var, idx + len(var[1])
     else:
         raise GBasicSyntaxError(idx, "Variable name expected")
@@ -230,24 +236,18 @@ def scan_chars(chars, ws_ok=True):
 # factor = primary (^ primary)*
 # primary = variable | constant | "(" expression ")"
 
-def sqz(a_list):
-    """Squeeze a list that has only one element, removing the outer list."""
-    while type(a_list) is list and len(a_list) == 1:
-        a_list = a_list[0]
-    return a_list
-
 @allow_ws
 def scan_primary(text, cur_idx):
     _, idx = scan_ws(text, cur_idx)
 
     if check_number(text, idx):
-        return scan_number(text, idx)
+        num, idx = scan_number(text, idx)
+        return [num], idx
     elif check_variable(text, idx):
-        return scan_variable(text, idx)
+        var, idx = scan_variable(text, idx)
+        return [var], idx
     elif check_chars("(")(text, idx):
-        print(repr(text[idx:]))
         _, idx = scan_chars("(")(text, idx)
-        print(repr(text[idx:]))
         primary, idx = scan_expression(text, idx)
         _, idx = scan_chars(")")(text, idx)
         return primary, idx
@@ -263,15 +263,15 @@ def scan_factor(text, cur_idx):
     idx = cur_idx
 
     primary, idx = scan_primary(text, idx)
-    out.append(primary)
+    out.extend(primary)
 
     while check_exp(text, idx):
         _, idx = scan_exp(text, idx)
         primary, idx = scan_primary(text, idx)
-        out.append(primary)
-        out.append((Token.operator, "^"))
+        out.extend(primary)
+        out.append((Element.op, Op.POW))
 
-    return sqz(out), idx
+    return out, idx
 
 @allow_ws
 def scan_term(text, cur_idx):
@@ -284,7 +284,7 @@ def scan_term(text, cur_idx):
     idx = cur_idx
 
     factor, idx = scan_factor(text, idx)
-    out.append(factor)
+    out.extend(factor)
 
     # TODO: fix all this crap
     while check_mul(text, idx) or check_div(text, idx):
@@ -295,10 +295,10 @@ def scan_term(text, cur_idx):
 
         factor, idx = scan_factor(text, idx)
 
-        out.append(factor)
-        out.append((Token.operator, op))
+        out.extend(factor)
+        out.append((Element.op, MathOps[op]))
 
-    return sqz(out), idx
+    return out, idx
 
 @allow_ws
 def scan_expression(text, cur_idx):
@@ -319,9 +319,9 @@ def scan_expression(text, cur_idx):
         op = None
 
     term, idx = scan_term(text, idx)
-    out.append(term)
-    if op:
-        out.append((Token.operator, op))
+    out.extend(term)
+    if op and op == "-":
+        out.append((Element.op, Op.NEG))
 
     # TODO: fix all this crap
     while check_add(text, idx) or check_sub(text, idx):
@@ -332,10 +332,10 @@ def scan_expression(text, cur_idx):
 
         term, idx = scan_term(text, idx)
 
-        out.append(term)
-        out.append((Token.operator, op))
+        out.extend(term)
+        out.append((Element.op, MathOps[op]))
 
-    return sqz(out), idx
+    return out, idx
 
 # Scanning whole lines
 
@@ -358,19 +358,66 @@ def scan_let(text, idx):
     var, idx = scan_variable(text, idx)
     _, idx = scan_chars("=")(text, idx)
 
-    if var[0] == Token.numvar:
+    out = [var]
+
+    if var[0] == Element.numvar:
         expression, idx = scan_expression(text, idx)
         scan_eof(text, idx)
-        return [var, expression, Op.LETNUM], idx
+        out.extend(expression)
+        out.append((Element.op, Op.LETNUM))
     else:
         outstr, idx = scan_string(text, idx)
         scan_eof(text, idx)
-        return [var, outstr, Op.LETSTR], idx
+        out.extend([outstr, (Element.op, Op.LETSTR)])
+    return out, idx
+
+@allow_ws
+def scan_print(text, idx):
+    """Scan to make sure line is a valid PRINT. It is assumed we have already
+    scanned the keyword PRINT.
+
+    PRINT will take the number on the stack beneath it to know how many items
+    to print.
+    """
+
+    check_comma = check_chars(",")
+    scan_comma = scan_chars(",")
+
+    out = []
+    items = 0
+    item = None
+
+    def scan_next(text, idx):
+        nonlocal items
+
+        # Try a string first, then an expression
+        try:
+            item, idx = scan_string(text, idx)
+            item = [item]
+        except GBasicSyntaxError:
+            item, idx = scan_expression(text, idx)
+
+        items += 1
+        return item, idx
+
+    item, idx = scan_next(text, idx)
+    out.extend(item)
+
+    while check_comma(text, idx):
+        _, idx = scan_comma(text, idx)
+        item, idx = scan_next(text, idx)
+        out.extend(item)
+
+    scan_eof(text, idx)
+
+    out.append(items)
+    out.append((Element.op, Op.PRINT))
+    return out, idx
 
 @allow_ws
 def scan_line(text, idx):
     keyword, idx = scan_keyword(text, idx)
-    if keyword[1] == "LET":
+    if keyword == "LET":
         return scan_let(text, idx)
     else:
-        raise GBasicSyntaxError(idx, "{} not yet implemented".format(keyword[1]))
+        raise GBasicSyntaxError(idx, "{} not yet implemented".format(keyword))
