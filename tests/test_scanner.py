@@ -249,9 +249,25 @@ def test_scan_print():
                    4,
                    (Element.op, Op.PRINT)]
 
+    text = '10 PRINT A$;'
+    out, idx = scan_print(text, 8)
+    assert out == [(Element.strvar, "A$"),
+                   1,
+                   (Element.op, Op.PRN)]
+
 
 def test_scan_line():
     text = '10 LET A = 1'
     out, idx = scan_line(text, 2)
     assert out == [(Element.numvar, "A"), 1, (Element.op, Op.LETNUM)]
+    assert idx == len(text)
+
+    text = "20 PRINT A"
+    out, idx = scan_line(text, 2)
+    assert out == [(Element.numvar, "A"), 1, (Element.op, Op.PRINT)]
+    assert idx == len(text)
+
+    text = "100 END"
+    out, idx = scan_line(text, 3)
+    assert out == [(Element.op, Op.END)]
     assert idx == len(text)

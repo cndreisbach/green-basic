@@ -3,7 +3,7 @@ from enum import Enum
 from functools import wraps
 
 Element = Enum('Element', 'lineno numlit strlit strvar numvar op')
-Op = Enum('Op', 'ADD SUB MUL DIV POW NEG LETNUM LETSTR PRINT')
+Op = Enum('Op', 'ADD SUB MUL DIV POW NEG LETNUM LETSTR PRINT PRN END')
 MathOps = {"+": Op.ADD,
            "-": Op.SUB,
            "*": Op.MUL,
@@ -408,16 +408,31 @@ def scan_print(text, idx):
         item, idx = scan_next(text, idx)
         out.extend(item)
 
+    if check_chars(";")(text, idx):
+        _, idx = scan_chars(";")(text, idx)
+        op = Op.PRN
+    else:
+        op = Op.PRINT
+
     scan_eof(text, idx)
 
     out.append(items)
-    out.append((Element.op, Op.PRINT))
+    out.append((Element.op, op))
     return out, idx
+
+@allow_ws
+def scan_end(text, idx):
+    scan_eof(text, idx)
+    return [(Element.op, Op.END)], idx
 
 @allow_ws
 def scan_line(text, idx):
     keyword, idx = scan_keyword(text, idx)
     if keyword == "LET":
         return scan_let(text, idx)
+    elif keyword == "PRINT":
+        return scan_print(text, idx)
+    elif keyword == "END":
+        return scan_end(text, idx)
     else:
         raise GBasicSyntaxError(idx, "{} not yet implemented".format(keyword))
