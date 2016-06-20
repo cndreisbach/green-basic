@@ -1,9 +1,9 @@
 import re
 from enum import Enum
 from functools import wraps
+from .operation import Op
 
 Element = Enum('Element', 'lineno numlit strlit strvar numvar op')
-Op = Enum('Op', 'ADD SUB MUL DIV POW NEG LETNUM LETSTR PRINT PRN END')
 MathOps = {"+": Op.ADD,
            "-": Op.SUB,
            "*": Op.MUL,
