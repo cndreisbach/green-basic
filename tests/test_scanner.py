@@ -267,6 +267,11 @@ def test_scan_line():
     assert out == [(Element.numvar, "A"), 1, (Element.op, Op.PRINT)]
     assert idx == len(text)
 
+    text = "30 GOTO 20"
+    out, idx = scan_line(text, 2)
+    assert out == [20, (Element.op, Op.GOTO)]
+    assert idx == len(text)
+
     text = "100 END"
     out, idx = scan_line(text, 3)
     assert out == [(Element.op, Op.END)]

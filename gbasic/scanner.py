@@ -1,6 +1,8 @@
 import re
-from enum import Enum
 from functools import wraps
+
+from enum import Enum
+
 from .operation import Op
 
 Element = Enum('Element', 'lineno numlit strlit strvar numvar op')
@@ -55,8 +57,9 @@ def allow_ws(scanfn):
     def wrapper(text, idx):
         _, idx = scan_ws(text, idx)
         return scanfn(text, idx)
+
     return wrapper
-        
+
 
 def scan_ws(text, cur_idx):
     """Scans for whitespace. Whitespace is never necessary, so if we do not
@@ -65,19 +68,21 @@ def scan_ws(text, cur_idx):
     # Return immediately if all we have is whitespace.
     if text[cur_idx:].lstrip() == '':
         return text[cur_idx:], len(text)
-    
+
     try:
         idx = next(i for i in range(cur_idx, len(text))
-                   if not text[i:i+1].isspace())
+                   if not text[i:i + 1].isspace())
         return text[cur_idx:idx], idx
     except StopIteration:
         return "", cur_idx
+
 
 def check_lineno(text, idx):
     """Checks for line numbers. Line numbers must be positive integers."""
     match = re.match(r"\d+", text[idx:])
     if match:
         return match.group(0)
+
 
 @allow_ws
 def scan_lineno(text, idx):
@@ -88,6 +93,7 @@ def scan_lineno(text, idx):
         return int(lineno), idx + len(lineno)
     else:
         raise GBasicSyntaxError(idx, "Line number expected")
+
 
 @allow_ws
 def scan_keyword(text, idx):
@@ -108,6 +114,7 @@ def check_variable(text, idx):
     if match:
         return match.group(0)
 
+
 @allow_ws
 def scan_variable(text, idx):
     """Scan for a variable name."""
@@ -126,7 +133,9 @@ def check_number(text, idx):
     """Check for a number. We are allowing more than the BASIC standard here.
     In BASIC, we'd only allow up to 11 digits and scientific numbers from -308 to 308."""
 
-    match = re.match(r"(?i)([+\-]?(?:[1-9]\d*|0))(?:\.([0-9]*))?(?:E([+-]?\d+))?", text[idx:])
+    match = re.match(
+        r"(?i)([+\-]?(?:[1-9]\d*|0))(?:\.([0-9]*))?(?:E([+-]?\d+))?",
+        text[idx:])
     if match:
         whole = match.group(1)
         decimal = match.group(2)
@@ -140,6 +149,7 @@ def check_number(text, idx):
             num = whole
 
         return num
+
 
 @allow_ws
 def scan_number(text, idx):
@@ -162,8 +172,10 @@ def check_string(text, idx):
     if match:
         return match.group(0)
 
+
 def unquote_string(quoted_str):
     return quoted_str[1:-1].replace('\\"', '"').replace('\\\\', '\\')
+
 
 def scan_string(text, cur_idx):
     _, idx = scan_ws(text, cur_idx)
@@ -177,6 +189,7 @@ def scan_string(text, cur_idx):
 
 def check_chars(chars, ws_ok=True):
     """Check for any particular characters."""
+
     def check(text, idx):
         if ws_ok:
             ws, idx = scan_ws(text, idx)
@@ -186,6 +199,7 @@ def check_chars(chars, ws_ok=True):
             return ws + chars
 
     return check
+
 
 def scan_chars(chars, ws_ok=True):
     check = check_chars(chars, ws_ok)
@@ -199,7 +213,8 @@ def scan_chars(chars, ws_ok=True):
         if out == chars:
             return chars, idx + len(out_ws)
         else:
-            raise GBasicSyntaxError(idx, "Characters '{}' expected".format(chars))
+            raise GBasicSyntaxError(idx,
+                                    "Characters '{}' expected".format(chars))
 
     return scan
 
@@ -254,6 +269,7 @@ def scan_primary(text, cur_idx):
 
     raise GBasicSyntaxError(cur_idx, "Number, variable, or expression expected")
 
+
 @allow_ws
 def scan_factor(text, cur_idx):
     check_exp = check_chars("^")
@@ -272,6 +288,7 @@ def scan_factor(text, cur_idx):
         out.append((Element.op, Op.POW))
 
     return out, idx
+
 
 @allow_ws
 def scan_term(text, cur_idx):
@@ -299,6 +316,7 @@ def scan_term(text, cur_idx):
         out.append((Element.op, MathOps[op]))
 
     return out, idx
+
 
 @allow_ws
 def scan_expression(text, cur_idx):
@@ -337,6 +355,7 @@ def scan_expression(text, cur_idx):
 
     return out, idx
 
+
 # Scanning whole lines
 
 @allow_ws
@@ -348,6 +367,7 @@ def scan_eof(text, idx):
         return True, idx
     else:
         raise GBasicSyntaxError(idx, "End of line expected")
+
 
 @allow_ws
 def scan_let(text, idx):
@@ -370,6 +390,7 @@ def scan_let(text, idx):
         scan_eof(text, idx)
         out.extend([outstr, (Element.op, Op.LETSTR)])
     return out, idx
+
 
 @allow_ws
 def scan_print(text, idx):
@@ -420,19 +441,35 @@ def scan_print(text, idx):
     out.append((Element.op, op))
     return out, idx
 
+
+@allow_ws
+def scan_goto(text, idx):
+    """Scan to make sure line is a valid GOTO. It is assumed we have already
+    scanned the keyword GOTO.
+    """
+    lineno, idx = scan_lineno(text, idx)
+    scan_eof(text, idx)
+    return [lineno, (Element.op, Op.GOTO)], idx
+
+
 @allow_ws
 def scan_end(text, idx):
     scan_eof(text, idx)
     return [(Element.op, Op.END)], idx
 
+
 @allow_ws
 def scan_line(text, idx):
     keyword, idx = scan_keyword(text, idx)
-    if keyword == "LET":
-        return scan_let(text, idx)
-    elif keyword == "PRINT":
-        return scan_print(text, idx)
-    elif keyword == "END":
-        return scan_end(text, idx)
+
+    keyword_map = {
+        "LET": scan_let,
+        "PRINT": scan_print,
+        "GOTO": scan_goto,
+        "END": scan_end,
+    }
+
+    if keyword in keyword_map:
+        return keyword_map[keyword](text, idx)
     else:
         raise GBasicSyntaxError(idx, "{} not yet implemented".format(keyword))

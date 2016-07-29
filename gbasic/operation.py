@@ -1,6 +1,6 @@
 from enum import Enum
 
-Op = Enum('Op', 'ADD SUB MUL DIV POW NEG LETNUM LETSTR PRINT PRN END')
+Op = Enum('Op', 'ADD SUB MUL DIV POW NEG GOTO LETNUM LETSTR PRINT PRN END')
 
 def execute(vm, op):
     operations = {
