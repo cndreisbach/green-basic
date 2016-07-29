@@ -14,23 +14,23 @@ MathOps = {"+": Op.ADD,
 
 keywords = {
     'LET',
-    'READ',
-    'DATA',
-    'RESTORE',
+    'READ', # TODO scan
+    'DATA', # TODO scan
+    'RESTORE', # TODO scan
     'PRINT',
     'GOTO',
-    'IF',
-    'ON',
-    'FOR',
-    'DIM',
+    'IF', # TODO scan
+    'ON', # TODO scan
+    'FOR', # TODO scan
+    'DIM', # TODO scan
     'END',
-    'RANDOM',
-    'GOSUB',
-    'RETURN',
-    'DEF',
-    'INPUT',
-    'REM',
-    'STOP',
+    'RANDOM', # TODO scan
+    'GOSUB', # TODO scan
+    'RETURN', # TODO scan
+    'DEF', # TODO scan
+    'INPUT', # TODO scan
+    'REM', # TODO scan
+    'STOP', # TODO scan
 }
 
 
