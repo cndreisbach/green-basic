@@ -5,34 +5,54 @@ Op = Enum('Op', 'ADD SUB MUL DIV POW NEG GOTO LETNUM LETSTR PRINT PRN END')
 def execute(vm, op):
     operations = {
         Op.ADD: add,
+        Op.SUB: sub,
+        Op.MUL: mul,
+        Op.DIV: div,
+        Op.POW: pow,
+        Op.NEG: neg,
         Op.LETNUM: letnum,
         Op.END: endop,
+        Op.GOTO: goto,
     }
     operations[op](vm)
 
-def eval_operand(vm, operand):
-    # TODO refactor to prevent circular import
-    from .scanner import Element
-
-    if not isinstance(operand, tuple):
-        return operand
-
-    if operand[0] is Element.numvar:
-        return vm.vars[operand[1]]
-
-    return operand
-
 def add(vm):
-    a = eval_operand(vm, vm.stack.pop())
-    b = eval_operand(vm, vm.stack.pop())
-    c = a + b
-    vm.stack.append(c)
+    a = vm.pop_and_resolve()
+    b = vm.pop_and_resolve()
+    vm.stack.append(b + a)
+
+def sub(vm):
+    a = vm.pop_and_resolve()
+    b = vm.pop_and_resolve()
+    vm.stack.append(b - a)
+
+def mul(vm):
+    a = vm.pop_and_resolve()
+    b = vm.pop_and_resolve()
+    vm.stack.append(b * a)
+
+def div(vm):
+    a = vm.pop_and_resolve()
+    b = vm.pop_and_resolve()
+    vm.stack.append(b / a)
+
+def pow(vm):
+    a = vm.pop_and_resolve()
+    b = vm.pop_and_resolve()
+    vm.stack.append(b ** a)
+
+def neg(vm):
+    a = vm.pop_and_resolve()
+    vm.stack.append(-a)
 
 def letnum(vm):
-    num = vm.stack.pop()
+    num = vm.pop_and_resolve()
     varname = vm.stack.pop()
     vm.vars[varname[1]] = num
 
 def endop(vm):
     vm.halt = True
 
+def goto(vm):
+    lineno = vm.stack.pop()
+    vm.goto(lineno)

@@ -305,9 +305,9 @@ def scan_term(text, cur_idx):
 
     # TODO: fix all this crap
     while check_mul(text, idx) or check_div(text, idx):
-        try:
+        if check_mul(text, idx):
             op, idx = scan_mul(text, idx)
-        except TypeError:
+        else:
             op, idx = scan_div(text, idx)
 
         factor, idx = scan_factor(text, idx)
@@ -343,9 +343,9 @@ def scan_expression(text, cur_idx):
 
     # TODO: fix all this crap
     while check_add(text, idx) or check_sub(text, idx):
-        try:
+        if check_add(text, idx):
             op, idx = scan_add(text, idx)
-        except TypeError:
+        else:
             op, idx = scan_sub(text, idx)
 
         term, idx = scan_term(text, idx)

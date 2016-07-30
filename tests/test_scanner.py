@@ -167,6 +167,14 @@ def test_scan_expression():
     out, _ = scan_expression(text, 0)
     assert out == [1, 2, (Element.op, Op.ADD)]
 
+    text = "1 - 2"
+    out, _ = scan_expression(text, 0)
+    assert out == [1, 2, (Element.op, Op.SUB)]
+
+    text = "1 / 2"
+    out, _ = scan_expression(text, 0)
+    assert out == [1, 2, (Element.op, Op.DIV)]
+
     text = "A1 ^ 2 + 2 * (A2 + 1)"
     out, _ = scan_expression(text, 0)
     assert out == [(Element.numvar, "A1"),

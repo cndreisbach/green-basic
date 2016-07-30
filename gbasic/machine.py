@@ -4,6 +4,14 @@ from .operation import Op, execute
 
 Line = namedtuple("Line", ("lineno", "text", "compiled"))
 
+
+class GBasicRuntimeError(Exception):
+    def __init__(self, idx, message=None):
+        self.idx = idx
+        self.message = message
+        super().__init__(idx, message)
+
+
 class Machine:
     """The virtual machine that stores and executes BASIC code."""
 
@@ -39,6 +47,44 @@ class Machine:
         self.linenos.remove(lineno)
         self.program = [l for l in self.program if l.lineno != lineno]
 
+    def resolve(self, element):
+        """
+        Resolve an element. If it is a literal, just return that literal.
+        If it is a variable, resolve it for the current value.
+        Otherwise, return the element.
+        """
+
+        if not isinstance(element, tuple):
+            return element
+
+        if element[0] is Element.numvar:
+            return self.vars[element[1]]
+
+        return element
+
+    def pop_and_resolve(self):
+        """
+        Pop the top element off the stack. If it is a variable, resolve it for
+        the current value.
+        """
+        element = self.stack.pop()
+        return self.resolve(element)
+
+    def goto(self, lineno):
+        """
+        Goto the line number.
+        """
+        if not lineno in self.linenos:
+            raise GBasicRuntimeError(
+                ("Cannot GOTO line number {}: "
+                 "line number does not exist").format(lineno))
+
+        # Obviously, this is not the best way.
+        for idx, line in enumerate(self.program):
+            if line.lineno == lineno:
+                self.pidx = idx
+                break
+
     def run(self):
         self.pidx = 0
         self.halt = False
@@ -46,6 +92,8 @@ class Machine:
         ## TODO add preflight (data)
 
         while self.pidx < len(self.program) and not self.halt:
+            cur_pidx = self.pidx
+
             line = self.program[self.pidx]
             for element in line.compiled:
                 if not isinstance(element, tuple):
@@ -59,8 +107,11 @@ class Machine:
                 else:
                     self.stack.append(element)
                     print(self.stack)
-
-            self.pidx += 1
+            
+            # We check this to make sure our current line number didn't change,
+            # as it would on a GOTO.
+            if cur_pidx == self.pidx:
+                self.pidx += 1
                 
         print(self.vars)
         print(self.stack)
