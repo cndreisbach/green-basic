@@ -55,3 +55,20 @@ def test_goto():
 
     assert m.vars.get("A") is None
     assert m.vars["B"] == 3
+
+def test_print(capsys):
+    m = Machine()
+    m.add_line("10 LET A = 1")
+    m.add_line('20 PRINT "THIS PROGRAM IS NUMBER", A')
+    m.run()
+
+    out, err = capsys.readouterr()
+    assert out == "THIS PROGRAM IS NUMBER 1\n"
+
+    # semicolon prevents newline
+    m.add_line('20 PRINT "THIS PROGRAM IS NUMBER", A;')
+    m.run()
+
+    out, err = capsys.readouterr()
+    assert out == "THIS PROGRAM IS NUMBER 1"
+

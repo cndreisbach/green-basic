@@ -1,6 +1,7 @@
 from collections import deque, namedtuple
-from .scanner import scan_line, scan_lineno, scan_eof, Element
-from .operation import Op, execute
+
+from .operation import execute
+from .scanner import scan_line, scan_lineno, Element
 
 Line = namedtuple("Line", ("lineno", "text", "compiled"))
 
@@ -21,7 +22,7 @@ class Machine:
         # The program is a list of Lines.
         self.program = []
         self.linenos = set()
-        
+
         # Vars are in a dictionary. No current idea on scope for functions.
         self.vars = {}
 
@@ -36,11 +37,11 @@ class Machine:
         return line
 
     def add_line(self, text):
-        line = self._process_line(text) 
+        line = self._process_line(text)
         if line.lineno in self.linenos:
             self.delete_line(line.lineno)
         self.linenos.add(line.lineno)
-        self.program.append(line)            
+        self.program.append(line)
         self.program.sort(key=lambda line: line.lineno)
 
     def delete_line(self, lineno):
@@ -98,27 +99,13 @@ class Machine:
             for element in line.compiled:
                 if not isinstance(element, tuple):
                     self.stack.append(element)
-                    print(self.stack)
                 elif element[0] is Element.op:
                     # run the operation
                     execute(self, element[1])
-                    print(element[1])
-                    print(self.stack)
                 else:
                     self.stack.append(element)
-                    print(self.stack)
-            
+
             # We check this to make sure our current line number didn't change,
             # as it would on a GOTO.
             if cur_pidx == self.pidx:
                 self.pidx += 1
-                
-        print(self.vars)
-        print(self.stack)
-
-
-
-
-
-
-

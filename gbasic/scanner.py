@@ -1,7 +1,6 @@
 import re
-from functools import wraps
-
 from enum import Enum
+from functools import wraps
 
 from .operation import Op
 
@@ -14,23 +13,23 @@ MathOps = {"+": Op.ADD,
 
 keywords = {
     'LET',
-    'READ', # TODO scan
-    'DATA', # TODO scan
-    'RESTORE', # TODO scan
+    'READ',  # TODO scan
+    'DATA',  # TODO scan
+    'RESTORE',  # TODO scan
     'PRINT',
     'GOTO',
-    'IF', # TODO scan
-    'ON', # TODO scan
-    'FOR', # TODO scan
-    'DIM', # TODO scan
+    'IF',  # TODO scan
+    'ON',  # TODO scan
+    'FOR',  # TODO scan
+    'DIM',  # TODO scan
     'END',
-    'RANDOM', # TODO scan
-    'GOSUB', # TODO scan
-    'RETURN', # TODO scan
-    'DEF', # TODO scan
-    'INPUT', # TODO scan
-    'REM', # TODO scan
-    'STOP', # TODO scan
+    'RANDOM',  # TODO scan
+    'GOSUB',  # TODO scan
+    'RETURN',  # TODO scan
+    'DEF',  # TODO scan
+    'INPUT',  # TODO scan
+    'REM',  # TODO scan
+    'STOP',  # TODO scan
 }
 
 
@@ -422,12 +421,12 @@ def scan_print(text, idx):
         return item, idx
 
     item, idx = scan_next(text, idx)
-    out.extend(item)
+    out = item + out
 
     while check_comma(text, idx):
         _, idx = scan_comma(text, idx)
         item, idx = scan_next(text, idx)
-        out.extend(item)
+        out = item + out
 
     if check_chars(";")(text, idx):
         _, idx = scan_chars(";")(text, idx)
