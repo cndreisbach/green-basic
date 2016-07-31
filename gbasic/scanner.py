@@ -29,7 +29,6 @@ keywords = {
     'DEF',  # TODO scan
     'INPUT',  # TODO scan
     'REM',  # TODO scan
-    'STOP',  # TODO scan
 }
 
 
